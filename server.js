@@ -10,7 +10,7 @@ require("dotenv").config();
 const configurePassport = require("./config/passport");
 configurePassport(passport);
 
-const allowedOrigins = ["http://www.ieeesoc.xyz", "https://www.ieeesoc.xyz","https://www.ieeesoc.xyz/repos"];
+const allowedOrigins = ["http://www.ieeesoc.xyz", "https://www.ieeesoc.xyz","https://www.ieeesoc.xyz/repos","'https://ieeesoc.xyz"];
 
 app.use(
   cors({
