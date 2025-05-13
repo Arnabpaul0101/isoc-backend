@@ -252,7 +252,7 @@ module.exports = function (passport) {
 
           if (!user) {
             const userCount = await User.countDocuments();
-            const isocId = `isoc25#${userCount + 1}`;
+            const isocId = `isoc25#${userCount + 2}`;
 
             user = await User.create({
               githubId: profile.id,
