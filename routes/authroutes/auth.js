@@ -7,7 +7,7 @@ const router = express.Router();
 router.get(
   "/github",
   passport.authenticate("github", {
-    scope: ["user:email", "read:org", "public_repo"], // access to user email, org info, and public repos only
+    scope: ["read:user", "user:email", "read:org"], // access to user email, org info, and public repos only
   })
 );
 
