@@ -3,11 +3,11 @@ const passport = require("passport");
 
 const router = express.Router();
 
-// GitHub login - include 'repo' scope for access to private repos + commit stats
+// GitHub login - include 'repo' scope for access to public repos + commit stats
 router.get(
   "/github",
   passport.authenticate("github", {
-    scope: ["user:email", "read:org", "repo"], // updated scope
+    scope: ["user:email", "read:org", "public_repo"], // access to user email, org info, and public repos only
   })
 );
 
