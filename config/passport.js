@@ -273,6 +273,9 @@ module.exports = function (passport) {
             user.joinedAt = joinedAt;
             user.followers = followers;
             user.following = following;
+            user.username    = username;
+            user.displayName = displayName;
+            user.avatar      = photos?.[0]?.value;
             await user.save();
 
             user._loginMessage = `Existing user logged in with ID ${user.isoc_id}`;
