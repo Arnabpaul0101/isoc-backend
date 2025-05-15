@@ -35,6 +35,31 @@ router.post("/:userId/contribute", async (req, res) => {
   }
 });
 
+
+router.get('/allUserdata', async (req, res) => {
+  try{
+    const users = await User.find({})
+    .populate(
+      path = 'pullRequestData',
+      select  = 'total open closed'
+    ).exec();
+    res.status(200).json({
+      success: true,
+      message: 'All user data fetched successfully',
+      data: users,
+    });
+  }
+  catch(error){
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user data',
+      error: error.message,
+    });
+  }
+})
+
+
 router.get('/:userId/repos', async (req, res) => {
   const { userId } = req.params;
   console.log('GET /:userId/repos hit');
