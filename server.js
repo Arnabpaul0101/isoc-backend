@@ -49,6 +49,7 @@ app.use("/api/auth", require("./routes/authroutes/auth"));
 app.use("/api/users", require("./routes/userroutes/userroute"));
 app.use("/api/dashboard", require("./routes/userroutes/dashboard"));
 app.use("/api/repos", require("./routes/reporoutes/reporoute"));
+app.use("/api/admin-dashboard", require("./routes/reporoutes/admin-dashboard"));
 
 app.listen(process.env.PORT, () => {
   console.log(`Server is running on port ${process.env.PORT}`);
