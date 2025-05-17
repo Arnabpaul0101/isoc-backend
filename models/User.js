@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema({
   pullRequests: [prSchema],
   pullRequestData: pullRequestDataSchema,
   points: { type: Number, default: 0 },
+
+  pointsAssigned: [
+    {
+      prUrl: String,
+      prTitle: String,
+      points: Number,
+    },
+  ],
 });
 
 module.exports = mongoose.model("User", userSchema);
