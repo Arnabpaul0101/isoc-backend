@@ -3,7 +3,6 @@ const router = express.Router();
 const User = require("../../models/User");
 const Repo = require("../../models/Repo");
 
-// Contribute to a repo
 router.post("/:userId/contribute", async (req, res) => {
   console.log("Contribute route hit");
   const { userId } = req.params;
@@ -11,6 +10,7 @@ router.post("/:userId/contribute", async (req, res) => {
 
   try {
     const user = await User.findById(userId);
+
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (user.ongoingprojects.includes(repoId)) {
@@ -35,11 +35,10 @@ router.post("/:userId/contribute", async (req, res) => {
   }
 });
 
-// Get all users
 router.get("/allUserdata", async (req, res) => {
   try {
     const users = await User.find({})
-      .populate("pullRequestData", "total open closed")
+      .populate((path = "pullRequestData"), (select = "total open closed"))
       .exec();
     res.status(200).json({
       success: true,
@@ -56,7 +55,6 @@ router.get("/allUserdata", async (req, res) => {
   }
 });
 
-// Get repos for user
 router.get("/:userId/repos", async (req, res) => {
   const { userId } = req.params;
   console.log("GET /:userId/repos hit");
@@ -76,7 +74,6 @@ router.get("/:userId/repos", async (req, res) => {
   }
 });
 
-// Remove repo from ongoing projects
 router.delete("/:userId/repos/:repoId", async (req, res) => {
   const { userId, repoId } = req.params;
   try {
@@ -96,23 +93,9 @@ router.delete("/:userId/repos/:repoId", async (req, res) => {
   }
 });
 
-// Update user points and record assigned PR
 router.patch("/:username/points", async (req, res) => {
   const { username } = req.params;
-  const { points, prUrl, prTitle } = req.body;
-
-  if (
-    typeof points !== "number" ||
-    !Number.isInteger(points) ||
-    points < 0 ||
-    !prUrl ||
-    !prTitle
-  ) {
-    return res.status(400).json({
-      message:
-        "Invalid request. Must include non-negative integer points, prUrl, and prTitle.",
-    });
-  }
+  const { points } = req.body;
 
   try {
     const user = await User.findOne({ username });
@@ -121,14 +104,10 @@ router.patch("/:username/points", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.points += points;
-
-    // Save points assignment for PR
-    user.pointsAssigned.push({ prUrl, prTitle, points });
-
+    user.points += points; // Add to the existing points.
     await user.save();
 
-    res.status(200).json({ message: "Points updated and PR tracked", user });
+    res.status(200).json({ message: "Points updated", user });
   } catch (err) {
     console.error("Error updating points:", err);
     res.status(500).json({ message: "Server error" });
