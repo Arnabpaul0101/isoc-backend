@@ -35,55 +35,50 @@ router.post("/:userId/contribute", async (req, res) => {
   }
 });
 
-
-router.get('/allUserdata', async (req, res) => {
-  try{
+router.get("/allUserdata", async (req, res) => {
+  try {
     const users = await User.find({})
-    .populate(
-      path = 'pullRequestData',
-      select  = 'total open closed'
-    ).exec();
+      .populate((path = "pullRequestData"), (select = "total open closed"))
+      .exec();
     res.status(200).json({
       success: true,
-      message: 'All user data fetched successfully',
+      message: "All user data fetched successfully",
       data: users,
     });
-  }
-  catch(error){
+  } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching user data',
+      message: "Error fetching user data",
       error: error.message,
     });
   }
-})
+});
 
-
-router.get('/:userId/repos', async (req, res) => {
+router.get("/:userId/repos", async (req, res) => {
   const { userId } = req.params;
-  console.log('GET /:userId/repos hit');
+  console.log("GET /:userId/repos hit");
 
-  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
 
   try {
-    const user = await User.findById(userId).populate('ongoingprojects');
+    const user = await User.findById(userId).populate("ongoingprojects");
 
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    console.log('User ongoing projects:', user.ongoingprojects);
-   res.json({ ongoingprojects: user.ongoingprojects });
+    console.log("User ongoing projects:", user.ongoingprojects);
+    res.json({ ongoingprojects: user.ongoingprojects });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-router.delete('/:userId/repos/:repoId', async (req, res) => {
+router.delete("/:userId/repos/:repoId", async (req, res) => {
   const { userId, repoId } = req.params;
   try {
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     user.ongoingprojects = user.ongoingprojects.filter(
       (project) => project.toString() !== repoId
@@ -91,12 +86,32 @@ router.delete('/:userId/repos/:repoId', async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: 'Repo removed from ongoing projects' });
+    res.status(200).json({ message: "Repo removed from ongoing projects" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
+router.patch("/:username/points", async (req, res) => {
+  const { username } = req.params;
+  const { points } = req.body;
+
+  try {
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.points += points; // Add to the existing points.
+    await user.save();
+
+    res.status(200).json({ message: "Points updated", user });
+  } catch (err) {
+    console.error("Error updating points:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 module.exports = router;
