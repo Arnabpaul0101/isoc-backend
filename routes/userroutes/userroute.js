@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../../models/User");
 const Repo = require("../../models/Repo");
+const PRPoints = require("../../models/PRpoints");
 
 router.post("/:userId/contribute", async (req, res) => {
   console.log("Contribute route hit");
@@ -35,26 +36,6 @@ router.post("/:userId/contribute", async (req, res) => {
   }
 });
 
-router.get("/allUserdata", async (req, res) => {
-  try {
-    const users = await User.find({})
-      .populate((path = "pullRequestData"), (select = "total open closed"))
-      .exec();
-    res.status(200).json({
-      success: true,
-      message: "All user data fetched successfully",
-      data: users,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching user data",
-      error: error.message,
-    });
-  }
-});
-
 router.get("/:userId/repos", async (req, res) => {
   const { userId } = req.params;
   console.log("GET /:userId/repos hit");
@@ -71,6 +52,27 @@ router.get("/:userId/repos", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get all users
+router.get("/allUserdata", async (req, res) => {
+  try {
+    const users = await User.find({})
+      .populate("pullRequestData", "total open closed")
+      .exec();
+    res.status(200).json({
+      success: true,
+      message: "All user data fetched successfully",
+      data: users,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user data",
+      error: error.message,
+    });
   }
 });
 
@@ -93,24 +95,46 @@ router.delete("/:userId/repos/:repoId", async (req, res) => {
   }
 });
 
-router.patch("/:username/points", async (req, res) => {
-  const { username } = req.params;
-  const { points } = req.body;
+// Save points for PR
+router.post("/points/assign", async (req, res) => {
+  const { prId, username, prTitle, points } = req.body;
+
+  if (!prId || !username || !prTitle) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
-    const user = await User.findOne({ username });
+    const existing = await PRPoints.findOne({ prId });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (existing && existing.assigned) {
+      return res
+        .status(400)
+        .json({ error: "Points already assigned for this PR" });
     }
 
-    user.points += points; // Add to the existing points.
-    await user.save();
+    const updated = await PRPoints.findOneAndUpdate(
+      { prId },
+      {
+        prId,
+        username,
+        prTitle,
+        points,
+        assigned: true,
+      },
+      { upsert: true, new: true }
+    );
 
-    res.status(200).json({ message: "Points updated", user });
+    // Update user's points
+    const user = await User.findOne({ username });
+    if (user) {
+      user.points = (user.points || 0) + points;
+      await user.save();
+    }
+
+    res.status(200).json({ success: true, data: updated });
   } catch (err) {
-    console.error("Error updating points:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error assigning points:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
