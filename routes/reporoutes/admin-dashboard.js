@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require("axios");
 const Repo = require("../../models/Repo");
 const User = require("../../models/User");
+const PRPoints = require("../../models/PRpoints");
 
 const ensureAuth = (req, res, next) => {
   if (req.isAuthenticated()) return next();
@@ -20,11 +21,9 @@ router.get("/", ensureAuth, async (req, res) => {
     let startTime, endTime;
 
     if (sort === "desc") {
-      // Newest to oldest: move backwards by offset days from now
       endTime = new Date(Date.now() - offset * 24 * 60 * 60 * 1000);
       startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
     } else {
-      // Oldest to newest: move forwards by offset days from baseDate
       startTime = new Date(baseDate.getTime() + offset * 24 * 60 * 60 * 1000);
       endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
     }
@@ -47,7 +46,6 @@ router.get("/", ensureAuth, async (req, res) => {
 
     const allMatchingPRs = [];
 
-    // Build repo filters for the search query, e.g. "repo:owner/name"
     const repoFilters = repos
       .map((r) => {
         const parts = r.url.replace("https://github.com/", "").split("/");
@@ -62,17 +60,8 @@ router.get("/", ensureAuth, async (req, res) => {
         .json({ message: "No repos found", pullRequests: [] });
     }
 
-    // GitHub search query:
-    // "type:pr created:<end> created:>=<start> <repo filters> <keyword>"
-    // GitHub search API only supports one 'created' filter, so combine as range
-    // So we use: created:<end> created:>=<start> (no official range syntax, so we do created:>=start and created:<end)
-
-    // Unfortunately, GitHub search API expects date in YYYY-MM-DD format (ISO string works but time ignored)
-
     const createdGte = startTime.toISOString().split("T")[0];
     const createdLt = endTime.toISOString().split("T")[0];
-
-    // We'll page through results until we hit end or 1000 results (GitHub Search max)
 
     let page = 1;
     const perPage = 100;
@@ -101,8 +90,30 @@ router.get("/", ensureAuth, async (req, res) => {
       const items = response.data.items;
       if (!items || items.length === 0) break;
 
-      // Map results
       for (const pr of items) {
+        const prIdStr = pr.id.toString(); // consistent string prId
+
+        // Insert into PRPoints if not exists
+        const prData = {
+          prId: prIdStr,
+          title: pr.title,
+          username: pr.user?.login || "unknown",
+          assigned: false,
+          points: 0,
+        };
+
+        try {
+          const existing = await PRPoints.findOne({ prId: prIdStr });
+          if (!existing) {
+            await PRPoints.create(prData);
+          }
+        } catch (e) {
+          console.error(`Error inserting PR ID ${prIdStr}:`, e.message);
+        }
+
+        // Fetch PRPoints to get assigned & points
+        const prPointsDoc = await PRPoints.findOne({ prId: prIdStr });
+
         allMatchingPRs.push({
           id: pr.id,
           number: pr.number,
@@ -121,10 +132,11 @@ router.get("/", ensureAuth, async (req, res) => {
             avatar_url: pr.user?.avatar_url,
             html_url: pr.user?.html_url,
           },
+          assigned: prPointsDoc?.assigned || false,
+          points: prPointsDoc?.points || 0,
         });
       }
 
-      // GitHub Search API caps at 1000 results total
       if (items.length < perPage || page * perPage >= 1000) {
         hasMore = false;
       } else {
@@ -133,7 +145,7 @@ router.get("/", ensureAuth, async (req, res) => {
     }
 
     res.status(200).json({
-      message: "PRs fetched",
+      message: "PRs fetched and inserted into DB (if new)",
       pullRequests: allMatchingPRs,
     });
   } catch (err) {
