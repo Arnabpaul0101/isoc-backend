@@ -11,21 +11,15 @@ const configurePassport = require("./config/passport");
 configurePassport(passport);
 
 const allowedOrigins = [
+  "http://ieeesoc.xyz",
+  "https://ieeesoc.xyz",
   "http://www.ieeesoc.xyz",
   "https://www.ieeesoc.xyz",
-  "https://www.ieeesoc.xyz/repos",
-  "https://ieeesoc.xyz",
 ];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: allowedOrigins,
     credentials: true,
   })
 );
