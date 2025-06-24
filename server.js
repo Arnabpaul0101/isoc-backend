@@ -29,6 +29,10 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      sameSite: 'None', // required for cross-origin
+      secure: true      // required when sameSite is 'None'
+    }
   })
 );
 
