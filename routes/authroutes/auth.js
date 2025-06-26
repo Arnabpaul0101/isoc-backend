@@ -1,137 +1,85 @@
-
 const express = require("express");
 const passport = require("passport");
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
-router.get(
-  "/github",
-  passport.authenticate("github", {
-    scope: ["read:user", "user:email", "read:org"], 
-  })
-);
-
-// GitHub callback
+// GitHub callback with JWT
 router.get(
   "/github/callback",
   passport.authenticate("github", {
     failureRedirect: "/login-failed",
-    session: true,
+    session: false, // Disable session for JWT approach
   }),
   (req, res) => {
-    console.log("=== CALLBACK SUCCESS ===");
-    console.log("Session ID:", req.sessionID);
-    console.log("User authenticated:", req.isAuthenticated());
-    console.log("User:", req.user);
-    console.log("Session data:", req.session);
+    console.log("=== CALLBACK SUCCESS (JWT) ===");
+    console.log("User authenticated:", req.user);
     
-   
-    req.session.save((err) => {
-      if (err) {
-        console.error("Session save error:", err);
-      } else {
-        console.log("Session saved successfully");
-      }
-      
-      // Set additional cookie for testing
-      res.cookie('auth-test', 'logged-in', {
-        sameSite: 'none',
-        secure: true,
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
-        partitioned: true
-      });
-      
-      console.log("========================");
-      res.redirect("https://www.ieeesoc.xyz/dashboard"); 
-    });
+    // Create JWT token
+    const token = jwt.sign(
+      { 
+        userId: req.user._id,
+        githubId: req.user.githubId,
+        username: req.user.username 
+      },
+      process.env.JWT_SECRET || process.env.SESSION_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    
+    res.redirect(`https://www.ieeesoc.xyz/dashboard?token=${token}`);
   }
 );
 
-// Test route to manually set session
-router.get("/test-session", (req, res) => {
-  req.session.test = "test-value";
-  req.session.save((err) => {
-    if (err) {
-      console.error("Test session save error:", err);
-      res.json({ error: "Session save failed" });
-    } else {
-      console.log("Test session saved");
-      res.json({ 
-        message: "Test session set", 
-        sessionId: req.sessionID,
-        sessionData: req.session
-      });
-    }
-  });
-});
-
-// Logout
-router.get("/logout", (req, res) => {
-  req.logout(() => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Session destroy error:", err);
-      }
-      
-      // Clear both cookies
-      res.clearCookie("sessionId", {
-        path: "/",
-        httpOnly: true,
-        sameSite: "none",
-        secure: true,
-        partitioned: true
-      });
-      
-      res.clearCookie("auth-test", {
-        path: "/",
-        httpOnly: true,
-        sameSite: "none",
-        secure: true,
-        partitioned: true
-      });
-      
-      res.redirect("https://www.ieeesoc.xyz/repos"); 
-    });
-  });
-});
-
-// Auth status check
-router.get("/status", (req, res) => {
-  console.log("=== DETAILED STATUS CHECK ===");
-  console.log("Request headers:", JSON.stringify(req.headers, null, 2));
-  console.log("Cookie header:", req.get('Cookie'));
-  console.log("Session ID:", req.sessionID);
-  console.log("Session data:", JSON.stringify(req.session, null, 2));
-  console.log("Is Authenticated:", req.isAuthenticated());
-  console.log("User:", req.user);
-  console.log("==============================");
-
-  // Set response headers to help with debugging
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Origin', req.get('Origin') || 'https://www.ieeesoc.xyz');
-
-  if (req.isAuthenticated()) {
-    res.json({ 
-      loggedIn: true, 
-      user: req.user,
-      sessionId: req.sessionID,
-      debug: {
-        hasCookies: !!req.get('Cookie'),
-        sessionExists: !!req.session,
-        authenticated: req.isAuthenticated()
-      }
-    });
-  } else {
-    res.json({ 
-      loggedIn: false,
-      sessionId: req.sessionID,
-      debug: {
-        hasCookies: !!req.get('Cookie'),
-        sessionExists: !!req.session,
-        authenticated: req.isAuthenticated()
-      }
-    });
+// JWT verification middleware
+const verifyJWT = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]; // Bearer token
+  
+  if (!token) {
+    return res.status(401).json({ loggedIn: false, message: 'No token provided' });
   }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.SESSION_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ loggedIn: false, message: 'Invalid token' });
+  }
+};
+
+// Status check with JWT
+router.get("/status", async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  console.log("=== JWT STATUS CHECK ===");
+  console.log("Token received:", !!token);
+  console.log("Headers:", req.headers.authorization);
+  
+  if (!token) {
+    return res.json({ loggedIn: false });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.SESSION_SECRET);
+    
+
+    const User = require('../../models/User'); 
+    const user = await User.findById(decoded.userId);
+    
+    if (user) {
+      res.json({ loggedIn: true, user });
+    } else {
+      res.json({ loggedIn: false, message: 'User not found' });
+    }
+  } catch (error) {
+    console.error("JWT verification failed:", error);
+    res.json({ loggedIn: false, message: 'Invalid token' });
+  }
+});
+
+
+router.get("/protected", verifyJWT, (req, res) => {
+  res.json({ message: "Access granted", user: req.user });
 });
 
 module.exports = router;
