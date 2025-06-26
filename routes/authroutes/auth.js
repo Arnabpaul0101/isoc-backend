@@ -32,7 +32,7 @@ router.get("/logout", (req, res) => {
         path: "/",
         httpOnly: true,
         sameSite: "lax",
-        secure: false, // set to true in production with HTTPS
+        secure: true, // set to true in production with HTTPS
       });
       res.redirect("https://www.ieeesoc.xyz/repos"); // replace with your frontend
     });
