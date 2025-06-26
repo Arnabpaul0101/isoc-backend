@@ -12,7 +12,7 @@ require("dotenv").config();
 const configurePassport = require("./config/passport");
 configurePassport(passport);
 
-// Trust proxy (important for Render/Heroku)
+
 app.set('trust proxy', 1);
 
 const allowedOrigins = [
@@ -22,7 +22,7 @@ const allowedOrigins = [
   "https://www.ieeesoc.xyz",
 ];
 
-// CORS configuration - must be before session
+
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -35,10 +35,19 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'Cookie',
+      'Cache-Control',  
+      'Pragma'         
+    ],
     exposedHeaders: ['Set-Cookie']
   })
 );
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 app.use(express.json());
 
@@ -56,7 +65,7 @@ mongoose
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
-    name: 'sessionId', // Custom session name
+    name: 'sessionId',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
@@ -65,11 +74,11 @@ app.use(
       collectionName: 'sessions'
     }),
     cookie: {
-      sameSite: 'none', // lowercase 'none'
+      sameSite: 'none',
       secure: true,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
-      partitioned: true // Add this for Chrome
+      partitioned: true
     }
   })
 );
