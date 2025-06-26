@@ -1,107 +1,85 @@
-// backend/server.js - Complete fix
-
 const express = require("express");
-const cors = require("cors");
-const mongoose = require("mongoose");
 const passport = require("passport");
-const app = express();
-const session = require("express-session");
-const MongoStore = require('connect-mongo'); 
-require("dotenv").config();
+const jwt = require('jsonwebtoken');
+const router = express.Router();
 
-const configurePassport = require("./config/passport");
-configurePassport(passport);
-
-
-app.set('trust proxy', 1);
-
-const allowedOrigins = [
-  "http://ieeesoc.xyz",
-  "https://ieeesoc.xyz",
-  "http://www.ieeesoc.xyz",
-  "https://www.ieeesoc.xyz",
-];
-
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      console.log("Request origin:", origin);
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'Cookie',
-      'Cache-Control',  
-      'Pragma'         
-    ],
-    exposedHeaders: ['Set-Cookie']
-  })
+// GitHub callback with JWT
+router.get(
+  "/github/callback",
+  passport.authenticate("github", {
+    failureRedirect: "/login-failed",
+    session: false, // Disable session for JWT approach
+  }),
+  (req, res) => {
+    console.log("=== CALLBACK SUCCESS (JWT) ===");
+    console.log("User authenticated:", req.user);
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { 
+        userId: req.user._id,
+        githubId: req.user.githubId,
+        username: req.user.username 
+      },
+      process.env.JWT_SECRET || process.env.SESSION_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    
+    res.redirect(`https://www.ieeesoc.xyz/dashboard?token=${token}`);
+  }
 );
 
-// Handle preflight requests explicitly
-app.options('*', cors());
+// JWT verification middleware
+const verifyJWT = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]; // Bearer token
+  
+  if (!token) {
+    return res.status(401).json({ loggedIn: false, message: 'No token provided' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.SESSION_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ loggedIn: false, message: 'Invalid token' });
+  }
+};
 
-app.use(express.json());
+// Status check with JWT
+router.get("/status", async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  console.log("=== JWT STATUS CHECK ===");
+  console.log("Token received:", !!token);
+  console.log("Headers:", req.headers.authorization);
+  
+  if (!token) {
+    return res.json({ loggedIn: false });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.SESSION_SECRET);
+    
 
-// Connect to MongoDB
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("MongoDB connected");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
-
-// Session configuration
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    name: 'sessionId',
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
-      touchAfter: 24 * 3600,
-      collectionName: 'sessions'
-    }),
-    cookie: {
-      sameSite: 'none',
-      secure: true,
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-      partitioned: true
+    const User = require('../../models/User'); 
+    const user = await User.findById(decoded.userId);
+    
+    if (user) {
+      res.json({ loggedIn: true, user });
+    } else {
+      res.json({ loggedIn: false, message: 'User not found' });
     }
-  })
-);
-
-// Debug middleware
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  console.log('Origin:', req.get('Origin'));
-  console.log('Cookies:', req.get('Cookie'));
-  console.log('Session ID:', req.sessionID);
-  next();
+  } catch (error) {
+    console.error("JWT verification failed:", error);
+    res.json({ loggedIn: false, message: 'Invalid token' });
+  }
 });
 
-app.use(passport.initialize());
-app.use(passport.session());
 
-// Routes
-app.use("/api/auth", require("./routes/authroutes/auth"));
-app.use("/api/users", require("./routes/userroutes/userroute"));
-app.use("/api/dashboard", require("./routes/userroutes/dashboard"));
-app.use("/api/repos", require("./routes/reporoutes/reporoute"));
-app.use("/api/admin-dashboard", require("./routes/reporoutes/admin-dashboard"));
-
-app.listen(process.env.PORT, () => {
-  console.log(`Server is running on port ${process.env.PORT}`);
+router.get("/protected", verifyJWT, (req, res) => {
+  res.json({ message: "Access granted", user: req.user });
 });
+
+module.exports = router;
