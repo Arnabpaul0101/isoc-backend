@@ -1,4 +1,4 @@
-
+// routes/authroutes/auth.js - Updated auth routes
 const express = require("express");
 const passport = require("passport");
 const router = express.Router();
@@ -14,124 +14,117 @@ router.get(
 router.get(
   "/github/callback",
   passport.authenticate("github", {
-    failureRedirect: "/login-failed",
+    failureRedirect: "https://www.ieeesoc.xyz/login?error=auth_failed",
     session: true,
   }),
-  (req, res) => {
+  async (req, res) => {
     console.log("=== CALLBACK SUCCESS ===");
     console.log("Session ID:", req.sessionID);
     console.log("User authenticated:", req.isAuthenticated());
     console.log("User:", req.user);
-    console.log("Session data:", req.session);
     
-   
-    req.session.save((err) => {
-      if (err) {
-        console.error("Session save error:", err);
-      } else {
-        console.log("Session saved successfully");
-      }
-      
-      // Set additional cookie for testing
-      res.cookie('auth-test', 'logged-in', {
-        sameSite: 'none',
-        secure: true,
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
-        partitioned: true
+    try {
+      // Ensure session is saved before redirect
+      await new Promise((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+          } else {
+            console.log("Session saved successfully");
+            resolve();
+          }
+        });
       });
+
+      // Add a small delay to ensure session propagation
+      setTimeout(() => {
+        console.log("Redirecting to dashboard");
+        res.redirect("https://www.ieeesoc.xyz/dashboard?auth=success");
+      }, 500);
       
-      console.log("========================");
-      res.redirect("https://www.ieeesoc.xyz/dashboard"); 
-    });
+    } catch (error) {
+      console.error("Callback error:", error);
+      res.redirect("https://www.ieeesoc.xyz/login?error=session_failed");
+    }
   }
 );
 
-// Test route to manually set session
-router.get("/test-session", (req, res) => {
-  req.session.test = "test-value";
-  req.session.save((err) => {
-    if (err) {
-      console.error("Test session save error:", err);
-      res.json({ error: "Session save failed" });
-    } else {
-      console.log("Test session saved");
-      res.json({ 
-        message: "Test session set", 
-        sessionId: req.sessionID,
-        sessionData: req.session
-      });
-    }
-  });
-});
-
 // Logout
 router.get("/logout", (req, res) => {
-  req.logout(() => {
+  console.log("Logout initiated for session:", req.sessionID);
+  
+  req.logout((err) => {
+    if (err) {
+      console.error("Logout error:", err);
+    }
+    
     req.session.destroy((err) => {
       if (err) {
         console.error("Session destroy error:", err);
       }
       
-      // Clear both cookies
-      res.clearCookie("sessionId", {
+      // Clear session cookie
+      res.clearCookie("connect.sid", {
         path: "/",
         httpOnly: true,
         sameSite: "none",
-        secure: true,
-        partitioned: true
+        secure: true
       });
       
-      res.clearCookie("auth-test", {
-        path: "/",
-        httpOnly: true,
-        sameSite: "none",
-        secure: true,
-        partitioned: true
-      });
-      
+      console.log("User logged out successfully");
       res.redirect("https://www.ieeesoc.xyz/repos"); 
     });
   });
 });
 
-// Auth status check
+// Auth status check with enhanced debugging
 router.get("/status", (req, res) => {
-  console.log("=== DETAILED STATUS CHECK ===");
-  console.log("Request headers:", JSON.stringify(req.headers, null, 2));
-  console.log("Cookie header:", req.get('Cookie'));
+  console.log("=== AUTH STATUS CHECK ===");
   console.log("Session ID:", req.sessionID);
-  console.log("Session data:", JSON.stringify(req.session, null, 2));
-  console.log("Is Authenticated:", req.isAuthenticated());
-  console.log("User:", req.user);
-  console.log("==============================");
+  console.log("Has cookies:", !!req.headers.cookie);
+  console.log("Cookie header:", req.headers.cookie);
+  console.log("Is authenticated:", req.isAuthenticated());
+  console.log("Session passport:", req.session?.passport);
+  console.log("User object:", req.user);
+  console.log("========================");
 
-  // Set response headers to help with debugging
+  // Ensure CORS headers are set
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Origin', req.get('Origin') || 'https://www.ieeesoc.xyz');
 
-  if (req.isAuthenticated()) {
-    res.json({ 
-      loggedIn: true, 
-      user: req.user,
+  const responseData = {
+    loggedIn: req.isAuthenticated(),
+    user: req.user || null,
+    debug: {
       sessionId: req.sessionID,
-      debug: {
-        hasCookies: !!req.get('Cookie'),
-        sessionExists: !!req.session,
-        authenticated: req.isAuthenticated()
-      }
-    });
-  } else {
-    res.json({ 
-      loggedIn: false,
-      sessionId: req.sessionID,
-      debug: {
-        hasCookies: !!req.get('Cookie'),
-        sessionExists: !!req.session,
-        authenticated: req.isAuthenticated()
-      }
-    });
-  }
+      hasCookies: !!req.headers.cookie,
+      sessionExists: !!req.session,
+      passportUser: req.session?.passport?.user,
+      authenticated: req.isAuthenticated(),
+      timestamp: new Date().toISOString()
+    }
+  };
+
+  res.json(responseData);
+});
+
+// Test endpoint to check session functionality
+router.get("/test-session", (req, res) => {
+  req.session.testValue = Date.now();
+  req.session.save((err) => {
+    if (err) {
+      console.error("Test session save error:", err);
+      res.json({ error: "Session save failed", details: err.message });
+    } else {
+      res.json({ 
+        message: "Test session created", 
+        sessionId: req.sessionID,
+        testValue: req.session.testValue,
+        cookies: req.headers.cookie
+      });
+    }
+  });
 });
 
 module.exports = router;
