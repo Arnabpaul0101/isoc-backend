@@ -20,7 +20,7 @@ router.get(
   }),
   (req, res) => {
     // Successful login
-    res.redirect("http://www.ieeesoc.xyz/dashboard"); // replace with your frontend
+    res.redirect("https://www.ieeesoc.xyz/dashboard"); // replace with your frontend
   }
 );
 
@@ -34,7 +34,7 @@ router.get("/logout", (req, res) => {
         sameSite: "lax",
         secure: false, // set to true in production with HTTPS
       });
-      res.redirect("http://www.ieeesoc.xyz/repos"); // replace with your frontend
+      res.redirect("https://www.ieeesoc.xyz/repos"); // replace with your frontend
     });
   });
 });
