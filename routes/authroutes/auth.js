@@ -3,11 +3,11 @@ const passport = require("passport");
 
 const router = express.Router();
 
-// GitHub login - include 'repo' scope for access to public repos + commit stats
+
 router.get(
   "/github",
   passport.authenticate("github", {
-    scope: ["read:user", "user:email", "read:org"], // access to user email, org info, and public repos only
+    scope: ["read:user", "user:email", "read:org"], 
   })
 );
 
@@ -20,7 +20,7 @@ router.get(
   }),
   (req, res) => {
     // Successful login
-    res.redirect("https://www.ieeesoc.xyz/dashboard"); // replace with your frontend
+    res.redirect("https://www.ieeesoc.xyz/dashboard"); 
   }
 );
 
@@ -32,9 +32,9 @@ router.get("/logout", (req, res) => {
         path: "/",
         httpOnly: true,
         sameSite: "lax",
-        secure: true, // set to true in production with HTTPS
+        secure: false, 
       });
-      res.redirect("https://www.ieeesoc.xyz/repos"); // replace with your frontend
+      res.redirect("https://www.ieeesoc.xyz/repos"); 
     });
   });
 });

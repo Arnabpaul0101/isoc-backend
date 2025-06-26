@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -5,6 +6,7 @@ const passport = require("passport");
 const app = express();
 app.use(express.json());
 const session = require("express-session");
+const MongoStore = require('connect-mongo'); 
 require("dotenv").config();
 
 const configurePassport = require("./config/passport");
@@ -30,18 +32,6 @@ app.use(
   })
 );
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      sameSite: 'None', // required for cross-origin
-      secure: true      // required when sameSite is 'None'
-    }
-  })
-);
-
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
@@ -50,6 +40,26 @@ mongoose
   .catch((err) => {
     console.error("MongoDB connection error:", err);
   });
+
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      touchAfter: 24 * 3600 
+    }),
+    cookie: {
+      sameSite: 'None',
+      secure: true, 
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, 
+      // domain: '.ieeesoc.xyz' 
+    }
+  })
+);
 
 app.use(passport.initialize());
 app.use(passport.session());
