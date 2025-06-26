@@ -35,7 +35,7 @@ app.use(
     },
     credentials: true, // This is crucial for cookies
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    allowedHeaders: ['*'],
     exposedHeaders: ['Set-Cookie']
   })
 );
