@@ -41,11 +41,20 @@ router.get("/logout", (req, res) => {
 
 // Auth status check
 router.get("/status", (req, res) => {
+   console.log("=== STATUS CHECK ===");
+  console.log("Headers:", req.headers);
+  console.log("Cookies:", req.headers.cookie);
+  console.log("Session ID:", req.sessionID);
+  console.log("Is Authenticated:", req.isAuthenticated());
+  console.log("User:", req.user);
+  console.log("===================");
   if (req.isAuthenticated()) {
     res.json({ loggedIn: true, user: req.user });
   } else {
     res.json({ loggedIn: false });
   }
 });
+
+
 
 module.exports = router;
