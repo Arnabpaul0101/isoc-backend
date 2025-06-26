@@ -1,4 +1,4 @@
-// app.js - Updated session and CORS configuration
+// app.js - Fixed CORS configuration
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -19,7 +19,7 @@ const allowedOrigins = [
   "https://www.ieeesoc.xyz",
 ];
 
-// CORS configuration - MUST be before session middleware
+// Fixed CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -33,10 +33,21 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true, // This is crucial for cookies
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['*'],
-    exposedHeaders: ['Set-Cookie']
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Cache-Control',
+      'Pragma',
+      'Expires'
+    ],
+    exposedHeaders: ['Set-Cookie'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200
   })
 );
 
@@ -52,24 +63,24 @@ mongoose
     console.error("MongoDB connection error:", err);
   });
 
-// Updated session configuration
+// Session configuration
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    name: 'connect.sid', // Explicit session name
+    name: 'connect.sid',
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
       touchAfter: 24 * 3600,
-      ttl: 24 * 60 * 60 // 1 day TTL
+      ttl: 24 * 60 * 60
     }),
     cookie: {
-      sameSite: 'none', // Required for cross-origin
-      secure: true,     // Required for production HTTPS
-      httpOnly: true,   // Security best practice
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      domain: undefined // Let browser determine domain
+      sameSite: 'none',
+      secure: true,
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+      domain: undefined
     }
   })
 );
